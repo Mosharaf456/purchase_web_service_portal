@@ -250,19 +250,31 @@ class Api extends ResourceController
         // Pass the parameters to the parent method
         return $this->fail($description, $code, $message);
     }
-    public function logout()
+
+    // Logout user
+    public function logout2()
     {
-        $refreshToken = $_COOKIE['refresh_token'] ?? null;
+        // $refreshToken = $_COOKIE['refresh_token'] ?? null;
+        // if ($refreshToken) {
+        //     $this->db->table('access_token')
+        //         ->where('token', hash('sha256', $refreshToken))
+        //         ->delete();
+
+        //     setcookie('refresh_token', '', time() - 3600, '/');
+        // }
+        // $refreshToken = $this->request->getVar('refresh_token');
+        $refreshToken = $this->request->getHeader('Authorization');
 
         if ($refreshToken) {
-            $this->db->table('access_token')
-                ->where('token', hash('sha256', $refreshToken))
-                ->delete();
-
-            setcookie('refresh_token', '', time() - 3600, '/');
+            $hashedToken = hash('sha256', $refreshToken);
+            $this->authTokenModel->where('token_hash', $hashedToken)->delete();
         }
+        
 
-        return $this->respond(['message' => 'Logged out successfully']);
+        return $this->respond([
+            'status' => true,
+            'message' => 'Logged out successfully'
+        ], 200);
     }
 
 }
