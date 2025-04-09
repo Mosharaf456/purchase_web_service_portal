@@ -1,3 +1,5 @@
 composer create-project codeigniter4/appstarter purchasing_web_service
 composer require firebase/php-jwt
 php spark serve
+tail -f source/backend/writable/logs/log-2025-04-09.log
+
