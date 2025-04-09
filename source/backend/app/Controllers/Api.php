@@ -21,7 +21,6 @@ class Api extends ResourceController
         helper('utility_helper');
         helper('jwt_helper');
         // $this->UserModel = model('UserModel');
-        $this->version = '';
     }
 
     public function index()
@@ -50,14 +49,17 @@ class Api extends ResourceController
     public function login()
     {
         $version = $this->request->getHeaderLine('Accept-Version');
-        $this->version = $version;
 
         if ($version === 'v1') {
             $credentials = $this->request->getJSON();
             $user = $this->getUserByCredentials($credentials->username, $credentials->password);
 
             if (!$user) {
-                return $this->failUnauthorized('Invalid credentials', 401);
+                $data['status'] = false;
+                $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+                $data['msg'] = 'Invalid credentials';
+
+                return $this->failUnauthorized($data, 401);
             }
 
             // Create JWT payload
@@ -72,31 +74,43 @@ class Api extends ResourceController
             $accessToken = create_jwt($payload, 'access');
             $refreshToken = create_jwt($payload, 'refresh');
 
+            $data['status'] = true;
+            // ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
+            $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+            $data['access_token'] = $accessToken;
+            $data['refresh_token'] = $refreshToken;
 
-            return $this->respond([
-                'access_token' => $accessToken,
-                'refresh_token' => $refreshToken,
-            ], 200); // 200 OK
+            return $this->respond($data, 200); // 200 OK
         } else {
-            return $this->failNotImplemented($version . 'Version not supported1', 501);
+            $data['status'] = false;
+            $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+            $data['msg'] = 'Version not supported';
+            return $this->failNotImplemented($data , 501);
         }
     }
 
-    public function refresh_post()
+    public function refresh()
     {
-        $version = $this->version;
+        $version = $this->request->getHeaderLine('Accept-Version');
 
         if ($version === 'v1') {
             $refreshToken = $this->request->getHeader('Authorization');
             if (!$refreshToken) {
-                return $this->failUnauthorized('Refresh token is required', 401);
+                $data['status'] = false;
+                $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+                $data['msg'] = 'Refresh token is required';
+                return $this->failUnauthorized($data, 401);
             }
 
             $token = str_replace('Bearer ', '', $refreshToken->getValue());
             $decoded = verify_jwt($token);
 
             if (!$decoded) {
-                return $this->failUnauthorized('Invalid or expired refresh token', 401);
+                $data['status'] = false;
+                $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+                $data['msg'] = 'Invalid or expired refresh token';
+
+                return $this->failUnauthorized($data, 401);
             }
 
             // Create new access token
@@ -109,31 +123,26 @@ class Api extends ResourceController
 
             $accessToken = create_jwt($payload, 'access');
 
-            return $this->respond([
-                'access_token' => $accessToken,
-            ], 200); // 200 OK
+            $data['status'] = true;
+            // ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
+            $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+            $data['access_token'] = $accessToken;
+            
+            return $this->respond($data, 200); // 200 OK
         } else {
-            return $this->failNotImplemented($version . 'Version not supported2', 501);
-        }
-    }
+            $data['status'] = false;
+            $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+            $data['msg'] = 'Version not supported';
 
-    // Sample method to check user credentials
-    private function getUserByCredentials($username, $password)
-    {
-        // For demo, hard-coded users
-        foreach ($this->users as $user) {
-            if ($user['username'] === $username && $user['password'] === $password) {
-                return $user;
-            }
+            return $this->failNotImplemented($data, 501);
         }
-        return null;
     }
 
     private function failNotImplemented($mesg, $status_code)
     {
         return $this->fail($mesg, $status_code);
     }
-    // Correct method signature to match the parent class
+    // method signature to match the parent class
     protected function failUnauthorized(string $description = 'Unauthorized', ?string $code = null, string $message = '')
     {
         // Pass the parameters to the parent method
