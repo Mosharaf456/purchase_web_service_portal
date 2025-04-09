@@ -24,3 +24,9 @@ function verify_jwt($token)
         return null;
     }
 }
+// if (!function_exists('generate_refresh_token')) {
+//     function generate_refresh_token()
+//     {
+//         return bin2hex(random_bytes(32));
+//     }
+// }

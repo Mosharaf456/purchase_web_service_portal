@@ -72,23 +72,45 @@ class Api extends ResourceController
 
             // Generate access and refresh tokens
             $accessToken = create_jwt($payload, 'access');
+
+            $payload = [
+                'uid' => $user['id'],
+                'username' => $user['username'],
+                'iat' => time(),
+                'exp' => time() + config(JWTConfig::class)->refreshTTL,
+            ];
             $refreshToken = create_jwt($payload, 'refresh');
 
             // Set refresh token in secure HTTP-only cookie
-            setcookie('refresh_token', $refreshToken, [
-                'expires' => time() + 604800,
-                'httponly' => true,
-                'secure' => true,
-                'samesite' => 'Strict'
-            ]);
+            // setcookie('refresh_token', $refreshToken, [
+            //     'expires' => time() + 604800,
+            //     'httponly' => true,
+            //     'secure' => true,
+            //     'samesite' => 'Strict'
+            // ]);
+            // Store refresh token in database
+            // $this->authTokenModel->insert([
+            //     'user_id' => $user['id'],
+            //     'token_hash' => hash('sha256', $refreshToken),
+            //     'expires_at' => date('Y-m-d H:i:s', time() + env('JWT_REFRESH_TOKEN_EXPIRY'))
+            // ]);
 
-            $data['status'] = true;
-            $data['device_info'] = $userAgent ?? 'N/A';
-            $data['ip_address'] = $ip ?? 'N/A';
-            // ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
-            $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
-            $data['access_token'] = $accessToken;
-            $data['refresh_token'] = $refreshToken;
+            //date('c')  ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
+            $data = [
+                'status' => true,
+                'message' => 'Login successful',
+                'data' => [
+                    'access_token' => $accessToken,
+                    'refresh_token' => $refreshToken,
+                    'user' => [
+                        'id' => $user['id'],
+                        'username' => $user['username'],
+                    ]
+                ],
+                'device_info' => $userAgent ?? 'N/A',
+                'ip_address' => $ip ?? 'N/A',
+                'metadata' => array('timestamp' => date('c'),'version' => $version)
+            ];
 
             return $this->respond($data, 200); // 200 OK
         } else {
@@ -119,6 +141,15 @@ class Api extends ResourceController
             $token = str_replace('Bearer ', '', $refreshToken->getValue());
             $decoded = verify_jwt($token);
 
+            //db check
+            // $hashedToken = hash('sha256', $refreshToken);
+            // $tokenRecord = $this->authTokenModel->where('token_hash', $hashedToken)->first();
+
+            // if (!$tokenRecord || strtotime($tokenRecord['expires_at']) < time()) {
+            //     return $this->failUnauthorized('Invalid or expired refresh token');
+            // }
+
+
             if (!$decoded) {
                 $data['status'] = false;
                 $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
@@ -127,23 +158,43 @@ class Api extends ResourceController
                 // return $this->failUnauthorized('Invalid or expired refresh token', 401);
             }
 
-            // Create new access token
+            // Create new refresh token
+             // Optionally rotate refresh token (security best practice)
+            $payload = [
+                'uid' => $decoded->uid,
+                'username' => $decoded->username,
+                'iat' => time(),
+                'exp' => time() + config(JWTConfig::class)->refreshTTL,
+            ];
+
+            $newRefreshToken = create_jwt($payload, 'refresh');
+
             $payload = [
                 'uid' => $decoded->uid,
                 'username' => $decoded->username,
                 'iat' => time(),
                 'exp' => time() + config(JWTConfig::class)->accessTTL,
             ];
+            $newAccessToken = create_jwt($payload, 'access');
+            
+            // // Update refresh token in database
+            // $this->authTokenModel->update($tokenRecord['id'], [
+            //     'token_hash' => hash('sha256', $newRefreshToken),
+            //     'expires_at' => date('Y-m-d H:i:s', time() + env('JWT_REFRESH_TOKEN_EXPIRY'))
+            // ]);
 
-            $accessToken = create_jwt($payload, 'access');
-
-            $data['status'] = true;
-            $data['device_info'] = $userAgent ?? 'N/A';
-            $data['ip_address'] = $ip ?? 'N/A';
-            // ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
-            $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
-            $data['device_info'] = $userAgent;
-            $data['access_token'] = $accessToken;
+            //date('c')  ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
+            $data = [
+                'status' => true,
+                'message' => 'Token refreshed successfully',
+                'data' => [
+                    'access_token' => $newAccessToken,
+                    'refresh_token' => $newRefreshToken,
+                ],
+                'device_info' => $userAgent ?? 'N/A',
+                'ip_address' => $ip ?? 'N/A',
+                'metadata' => array('timestamp' => date('c'),'version' => $version)
+            ];
             
             return $this->respond($data, 200); // 200 OK
         } else {
@@ -155,13 +206,36 @@ class Api extends ResourceController
         }
     }
 
+
+    // Access Protected Route: GET /api/profile
+
+    // Header: Authorization: Bearer <access_token>
+    public function profile()
+    {
+        $userId = $this->request->user_id;
+        $userModel = new UserModel();
+        $user = $userModel->find($userId);
+
+        if (!$user) {
+            return $this->failNotFound('User not found');
+        }
+
+        unset($user['password']);
+
+        return $this->respond([
+            'status' => 'success',
+            'data' => $user
+        ], 200);
+    }
     private function getUserByCredentials($username, $password)
     {
         // For demo, hard-coded users
         foreach ($this->users as $user) {
-            if ($user['username'] === $username && $user['password'] === $password) {
+            $user['password'] = password_hash($user['password'], PASSWORD_DEFAULT);
+            if ($user['username'] === $username && password_verify($password, $user['password'])) {
                 return $user;
             }
+            
         }
         return null;
     }
