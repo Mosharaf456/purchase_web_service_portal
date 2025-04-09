@@ -15,8 +15,8 @@ class JWT extends BaseConfig
     {
         $this->key = env('JWT_SECRET_KEY');
         $this->alg = env('JWT_ALG');
-        $this->accessTTL = env('JWT_ACCESS_TTL');
-        $this->refreshTTL = env('JWT_REFRESH_TTL');
+        $this->accessTTL = env('JWT_ACCESS_TOKEN_EXPIRY');
+        $this->refreshTTL = env('JWT_REFRESH_TOKEN_EXPIRY');
         
         
         // If you want to ensure it's set and not empty

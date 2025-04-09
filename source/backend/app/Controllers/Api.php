@@ -46,6 +46,8 @@ class Api extends ResourceController
     public function login()
     {
         $version = $this->request->getHeaderLine('Accept-Version');
+        $userAgent = $this->request->getUserAgent()->getAgentString();
+        $ip = $this->request->getIPAddress();
 
         if ($version === 'v1') {
             $credentials = $this->request->getJSON();
@@ -72,7 +74,17 @@ class Api extends ResourceController
             $accessToken = create_jwt($payload, 'access');
             $refreshToken = create_jwt($payload, 'refresh');
 
+            // Set refresh token in secure HTTP-only cookie
+            setcookie('refresh_token', $refreshToken, [
+                'expires' => time() + 604800,
+                'httponly' => true,
+                'secure' => true,
+                'samesite' => 'Strict'
+            ]);
+
             $data['status'] = true;
+            $data['device_info'] = $userAgent ?? 'N/A';
+            $data['ip_address'] = $ip ?? 'N/A';
             // ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
             $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
             $data['access_token'] = $accessToken;
@@ -91,6 +103,8 @@ class Api extends ResourceController
     public function refresh()
     {
         $version = $this->request->getHeaderLine('Accept-Version');
+        $userAgent = $this->request->getUserAgent()->getAgentString();
+        $ip = $this->request->getIPAddress();
 
         if ($version === 'v1') {
             $refreshToken = $this->request->getHeader('Authorization');
@@ -124,8 +138,11 @@ class Api extends ResourceController
             $accessToken = create_jwt($payload, 'access');
 
             $data['status'] = true;
+            $data['device_info'] = $userAgent ?? 'N/A';
+            $data['ip_address'] = $ip ?? 'N/A';
             // ISO 8601 standard date format YYYY-MM-DDTHH:MM:SS+00:00
             $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+            $data['device_info'] = $userAgent;
             $data['access_token'] = $accessToken;
             
             return $this->respond($data, 200); // 200 OK
@@ -159,4 +176,19 @@ class Api extends ResourceController
         // Pass the parameters to the parent method
         return $this->fail($description, $code, $message);
     }
+    public function logout()
+    {
+        $refreshToken = $_COOKIE['refresh_token'] ?? null;
+
+        if ($refreshToken) {
+            $this->db->table('access_token')
+                ->where('token', hash('sha256', $refreshToken))
+                ->delete();
+
+            setcookie('refresh_token', '', time() - 3600, '/');
+        }
+
+        return $this->respond(['message' => 'Logged out successfully']);
+    }
+
 }
