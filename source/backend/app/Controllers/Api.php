@@ -133,9 +133,20 @@ class Api extends ResourceController
             $data['status'] = false;
             $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
             $data['msg'] = 'Version not supported';
-
+            
             return $this->failNotImplemented($data, 501);
         }
+    }
+
+    private function getUserByCredentials($username, $password)
+    {
+        // For demo, hard-coded users
+        foreach ($this->users as $user) {
+            if ($user['username'] === $username && $user['password'] === $password) {
+                return $user;
+            }
+        }
+        return null;
     }
 
     private function failNotImplemented($mesg, $status_code)
