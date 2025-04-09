@@ -5,11 +5,9 @@ namespace App\Controllers;
 use CodeIgniter\RESTful\ResourceController;
 use Firebase\JWT\JWT;
 use Config\JWT as JWTConfig;
-use CodeIgniter\API\ResponseTrait;
 
 class Api extends ResourceController
 {
-    use ResponseTrait;
     // Sample user data for demo purposes
     private $users = [
         ['username' => 'user1', 'password' => 'password1', 'id' => 1],
@@ -31,17 +29,16 @@ class Api extends ResourceController
         // $acceptVersion = $this->request->getHeader('Accept-Version');
         // $acceptVersion = $acceptVersion->getValue();
         $version = $this->request->getHeaderLine('Accept-Version');
-        $this->version = $version ?: 'N/A';
 
 
-        // $all_params_req_data = $this->request->getGetPost();
-        // if (is_array($all_params_req_data)) {
-        //     $all_params_req_data = array_map('trim', $all_params_req_data);
-        // } 
-        // $data['all_params'] = $all_params_req_data;
+        $all_params_req_data = $this->request->getGetPost();
+        if (is_array($all_params_req_data)) {
+            $all_params_req_data = array_map('trim', $all_params_req_data);
+        } 
         
-        $data['status'] = false;
-        $data['metadata'] = array('version' => $this->version);
+        $data['status'] = true;
+        $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
+        $data['all_params'] = $all_params_req_data;
 
         return $this->respond($data,200);
     }
@@ -59,7 +56,8 @@ class Api extends ResourceController
                 $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
                 $data['msg'] = 'Invalid credentials';
 
-                return $this->failUnauthorized($data, 401);
+                return $this->respond($data, 200);
+                // return $this->failUnauthorized($data, 401);
             }
 
             // Create JWT payload
@@ -85,7 +83,8 @@ class Api extends ResourceController
             $data['status'] = false;
             $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
             $data['msg'] = 'Version not supported';
-            return $this->failNotImplemented($data , 501);
+            return $this->respond($data, 501);
+            // return $this->failNotImplemented('Version not supported' , 501);
         }
     }
 
@@ -99,7 +98,8 @@ class Api extends ResourceController
                 $data['status'] = false;
                 $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
                 $data['msg'] = 'Refresh token is required';
-                return $this->failUnauthorized($data, 401);
+                return $this->respond($data, 200);
+                // return $this->failUnauthorized('Refresh token is required', 401);
             }
 
             $token = str_replace('Bearer ', '', $refreshToken->getValue());
@@ -109,8 +109,8 @@ class Api extends ResourceController
                 $data['status'] = false;
                 $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
                 $data['msg'] = 'Invalid or expired refresh token';
-
-                return $this->failUnauthorized($data, 401);
+                return $this->respond($data, 200);
+                // return $this->failUnauthorized('Invalid or expired refresh token', 401);
             }
 
             // Create new access token
@@ -133,8 +133,8 @@ class Api extends ResourceController
             $data['status'] = false;
             $data['metadata'] = array('timestamp' => date('c'),'version' => $version);
             $data['msg'] = 'Version not supported';
-            
-            return $this->failNotImplemented($data, 501);
+            return $this->respond($data, 501);
+            // return $this->failNotImplemented('Version not supported', 501);
         }
     }
 
