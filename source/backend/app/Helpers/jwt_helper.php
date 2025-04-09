@@ -6,7 +6,7 @@ use Config\JWT as JWTConfig;
 
 function create_jwt($payload, $type = 'access')
 {
-    log_me('ABC MH');
+    log_me('create_jwt called...');
     $key = config(JWTConfig::class)->key;
     $ttl = ($type === 'refresh') ? config(JWTConfig::class)->refreshTTL : config(JWTConfig::class)->accessTTL;
     $payload['exp'] = time() + $ttl;
